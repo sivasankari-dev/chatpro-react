@@ -1,103 +1,6 @@
-// import { useState, useEffect } from "react";
-// import { db } from "../firebaseConfig";
-// import {
-//   collection,
-//   addDoc,
-//   onSnapshot,
-//   orderBy,
-//   query,
-// } from "firebase/firestore";
-// import type { DocumentData } from "firebase/firestore";
-// import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
-
-// interface DMChatProps {
-//   currentUser: string;
-//   recipient: string;
-// }
-
-// interface Message {
-//   from: string;
-//   to: string;
-//   text: string;
-//   timestamp: number;
-// }
-
-// export default function DMChat({ currentUser, recipient }: DMChatProps) {
-//   const [text, setText] = useState("");
-//   const [messages, setMessages] = useState<Message[]>([]);
-
-//   useEffect(() => {
-//     const q = query(collection(db, "messages"), orderBy("timestamp"));
-//     const unsub = onSnapshot(q, (snapshot) => {
-//       const data = snapshot.docs.map((doc) => doc.data() as DocumentData);
-//       setMessages(data as Message[]);
-//     });
-//     return () => unsub();
-//   }, []);
-
-//   async function sendMessage() {
-//     if (!text.trim()) return;
-//     await addDoc(collection(db, "messages"), {
-//       from: currentUser,
-//       to: recipient,
-//       text,
-//       timestamp: Date.now()
-//     });
-//     setText("");
-//   }
-
-//   return (
-//     <div className="flex justify-center mt-10">
-//       <Card className="w-full max-w-md shadow-lg">
-//         <CardHeader>
-//           <h3 className="text-lg font-semibold">
-//             Chat with <span className="text-blue-500">{recipient}</span>
-//           </h3>
-//         </CardHeader>
-
-//         <CardContent>
-//           <div className="h-80 overflow-y-auto space-y-2 p-2 border rounded-lg bg-gray-50">
-//             {messages
-//               .filter(
-//                 (m) =>
-//                   (m.from === currentUser && m.to === recipient) ||
-//                   (m.from === recipient && m.to === currentUser)
-//               )
-//               .map((m, i) => (
-//                 <div
-//                   key={i}
-//                   className={`p-2 rounded-lg text-sm max-w-[80%] ${
-//                     m.from === currentUser
-//                       ? "bg-blue-500 text-white self-end ml-auto"
-//                       : "bg-gray-200 text-gray-900"
-//                   }`}
-//                 >
-//                   <p className="font-semibold">{m.from}</p>
-//                   <p>{m.text}</p>
-//                 </div>
-//               ))}
-//           </div>
-//         </CardContent>
-
-//         <CardFooter className="flex gap-2">
-//           <Input
-//             value={text}
-//             onChange={(e) => setText(e.target.value)}
-//             placeholder="Type a message..."
-//             className="flex-1"
-//           />
-//           <Button onClick={sendMessage}>Send</Button>
-//         </CardFooter>
-//       </Card>
-//     </div>
-//   );
-// }
-
 import { useEffect, useState } from "react";
 import { db } from "../firebaseConfig";
-import { collection, query, getDocs, addDoc, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, getDocs, addDoc, where, orderBy, onSnapshot } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -107,19 +10,34 @@ interface DMChatProps {
     selectedRecipient?: string; // optional, can set from dropdown
 }
 
+interface UserInfo {
+  displayName: string;
+  email: string;
+}
+
 export default function DMChat({ currentUser, selectedRecipient }: DMChatProps) {
     const [recipient, setRecipient] = useState(selectedRecipient || "");
-    const [users, setUsers] = useState<string[]>([]);
+    const [users, setUsers] = useState<UserInfo[]>([]);
+    // const [users, setUsers] = useState<{email:string, name:string} | null>(null);
+    // const [name, setName] = useState<string[]>([]);
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState("");
 
     // Fetch all users except current
     useEffect(() => {
         const fetchUsers = async () => {
-            //   const q = query(collection(db, "users"), where("email", "!=", currentUser), orderBy("email"));
-            const q = query(collection(db, "users"));
+              const q = query(collection(db, "users"), where("email", "!=", currentUser), orderBy("email"));
+            // const q = query(collection(db, "users"));
             const snapshot = await getDocs(q);
-            setUsers(snapshot.docs.map(doc => doc.data().email).filter(email => email !== currentUser));
+            // setUsers(snapshot.docs.map(doc => doc.data().email).filter(email => email !== currentUser));
+       
+            setUsers(snapshot.docs.map(doc => ({
+                displayName :doc.data().displayName,
+               email: doc.data().email
+        })))
+           
+            // setUsers(snapshot.docs.map(doc => doc.data().email));
+            // setName(snapshot.docs.map(doc => doc.data().displayName));
             //   console.log(currentUser)
 
         };
@@ -128,8 +46,8 @@ export default function DMChat({ currentUser, selectedRecipient }: DMChatProps) 
 
     // Fetch chat messages when recipient changes
     useEffect(() => {
-        console.log(currentUser)
-        console.log(recipient)
+        // console.log(currentUser)
+        // console.log(recipient)
         if (!recipient) return;
         const chatId = [currentUser, recipient].sort().join("_");
         // const q = query(
@@ -146,7 +64,7 @@ export default function DMChat({ currentUser, selectedRecipient }: DMChatProps) 
         const unsub = onSnapshot(q, (snapshot) => {
             setMessages(snapshot.docs.map(doc => doc.data()));
         });
-        console.log(unsub)
+        // console.log(unsub)
         return () => unsub();
     }, [currentUser, recipient]);
 
@@ -163,31 +81,34 @@ export default function DMChat({ currentUser, selectedRecipient }: DMChatProps) 
     };
 
     return (
-        <div className="bg-white p-4 rounded-lg border-2 shadow max-w-lg mx-auto">
-            {/* Recipient Selector
-      <select
-        className="w-full border rounded p-2 mb-4"
-        value={recipient}
-        onChange={(e) => setRecipient(e.target.value)}
-      >
-        <option value="">Select recipient</option>
-        {users.map((u) => (
-          <option key={u} value={u}>{u}</option>
-        ))}
-      </select> */}
-
+        <div className="flex bg-white p-2 rounded-lg border-2 shadow max-w-2xl mx-auto justify-between">
+            <div className="bg-blue-200 w-sm hidden md:block">
+                
+                {users.map((u) => (
+                    <button 
+                    className="flex p-2 w-full hover:bg-cyan-400 focus:bg-cyan-400 text-md font-semibold font-sans"
+                    type = "button"
+                    onClick={() =>setRecipient(u.email)}
+                    key={u.email}>{u.displayName}
+                    </button>
+                ))}
+            </div>
+                <div className="mx-4 w-3xl">
+                    <div className="md:hidden">
             <Select value={recipient} onValueChange={setRecipient}>
                 <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select recipient" />
                 </SelectTrigger>
                 <SelectContent>
                     {users.map((u) => (
-                        <SelectItem key={u} value={u}>
-                            {u}
+                        <SelectItem key={u.email} value={u.email}>
+                            {u.displayName}
                         </SelectItem>
                     ))}
                 </SelectContent>
             </Select>
+
+            </div>
 
             {/* Messages */}
             <div className="h-64 overflow-y-auto border rounded p-2 mb-4 bg-gray-50">
@@ -215,8 +136,12 @@ export default function DMChat({ currentUser, selectedRecipient }: DMChatProps) 
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                 />
-                <Button onClick={sendMessage}>Send</Button>
+                <Button className="cursor-pointer" onClick={sendMessage}>Send</Button>
             </div>
+        </div>
+         {/* <div className="bg-cyan-400 p-6 w-sm">
+                <p className="w-full text-center">{recipient}</p>
+            </div> */}
         </div>
     );
 }
